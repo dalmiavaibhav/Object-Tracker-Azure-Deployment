@@ -10,6 +10,7 @@
           <option value="webcam">Webcam</option>
           <option value="video2.mp4">Video2.mp4</option>
           <option value="motor_bike.mp4">Motor_bike.Mp4</option>
+          <option value="compressed.mp4">compressed.Mp4</option>
 
           <option value="uav0000024_00000_s.mp4">uav0000024_00000_s.mp4</option>
           <option value="uav0000029_01102_s.mp4">uav0000029_01102_s.mp4</option>
@@ -64,10 +65,21 @@
     
     <br>
     <hr>
+    <!-- <form action="/player" method="get">
+      <input type="submit" id='start' value='Start'>
+    </form>
+     --><br>
     <button id='start' type="button">Start Tracking</button>
     <button id='stop' type="button">Eval/Reset</button>
     <br>
     <hr>
+    <!-- <video id='hls-example'  class="video-js vjs-default-skin" width="400" height="300" controls>
+	    <source type="application/x-mpegURL" src="static/hls/pipe.m3u8">
+    </video> -->
+    <div id='hls-container'>
+
+    </div>
+
     <div id='streamer'></div>
     <div id ='success_plot'></div>
     <div id ='precision_plot'></div>      

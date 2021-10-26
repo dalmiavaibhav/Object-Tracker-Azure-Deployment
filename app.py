@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import ObjectDetection
 import ObjectTracking
 import numpy as np
-import cv2
+import subprocess
 import base64
 import json
+import cv2
 import os
 
 app = Flask(__name__)
@@ -24,6 +25,68 @@ tracks = None
 vs_name = None
 gt = None
 f = None
+
+def start_pipe(stream):
+    global vs, detector, tracker, SOT, tracker_name, MOT, tracks, gt, f
+    rtmp_url = f'rtmp://52.247.58.8:1935/live/{stream}'
+    fps = int(vs.get(cv2.CAP_PROP_FPS))
+    width = int(vs.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(vs.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    
+    command = ['ffmpeg', '-y','-f', 'rawvideo','-vcodec', 'rawvideo','-pix_fmt', 'bgr24','-s', "{}x{}".format(width, height),'-r', str(fps),'-i', '-',
+            '-c:a', 'libfdk_aac', '-b:a', '32k', '-c:v', 'libx264','-pix_fmt', 'yuv420p','-f', 'flv',rtmp_url]
+
+
+    p = subprocess.Popen(command, stdin=subprocess.PIPE)
+
+    while vs.isOpened():
+        f+=1
+        ret, frame = vs.read()
+        if not ret:
+            print("frame read failed")
+            break
+
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        timer = cv2.getTickCount()
+        
+        if gt is not None:
+            cv2.rectangle(frame, (int(gt[f][0]), int(gt[f][1])), (int(gt[f][0]+gt[f][2]), int(gt[f][1]+gt[f][3])), (0, 255, 0), 2, 1)
+           
+        if tracker_name in SOT:
+            #print('SOT')
+            trackers = tracker.track(frame)
+            #print(f'trackers {trackers} tracks {tracks}')
+            
+        if tracker_name in MOT:
+            #print('MOT')
+            dets = detector.detect(frame)
+            trackers = tracker.track(dets)
+            
+        fps = cv2.getTickFrequency()/(cv2.getTickCount() - timer)
+        #print(f'fps:{fps}')
+        #cv2.putText(frame, f'fps:{fps}', (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        if trackers is not None:
+            if tracker_name in SOT:
+                box = np.array(trackers[0].tolist())
+                box[2:] -= box[:2]
+                tracks.append(box.tolist())
+            
+            for track in trackers:
+                cv2.rectangle(frame, (int(track[0]), int(track[1])), (int(track[2]), int(track[3])), (0, 0, 255), 2, 1)
+                if len(track) > 4:
+                    cv2.putText(frame, f'id:{track[4]}', (int(track[0]), int(track[1])), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    
+                else:
+                    cv2.putText(frame, f'id:1', (int(track[0]), int(track[1])), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
+        # YOUR CODE FOR PROCESSING FRAME HERE
+        # write to pipe
+        print('Wrote to pipe')
+        p.stdin.write(frame.tobytes())
+    p.terminate()
+
+
 
 def clean_resources():
     delete_vs()
@@ -148,6 +211,11 @@ def gen():
 def index():
     return render_template('index.html')
     
+@app.route('/player', methods=['GET'])
+def player():
+    return render_template('player.html', stream_name=vs_name.split('.')[0]+tracker_name)
+    
+
 @app.route('/video_feed', methods=['GET'])
 def video_feed():
     return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -158,7 +226,7 @@ def connection():
 
 @socketio.on('disconnect')
 def disconnect():
-    clean_resources()
+    #clean_resources()
     print('Client Disconnected.')
 
 @socketio.on('create_vs')
@@ -167,12 +235,16 @@ def create_vs(input):
         global vs, vs_name, f
         f = -1
         vs_name = input
+        print(input)
         if input == 'webcam':
             vs = cv2.VideoCapture(0)
         else:
             vs = cv2.VideoCapture(os.path.join('static', input))
 
-        print('Video Source Created.')
+        if vs.isOpened():
+            print('Video Source Created.')
+        else:
+            print('Could not open the video source')
     except:
         print('Could not open video source.')
 
@@ -201,12 +273,13 @@ def init_tracker():
     ret, frame = vs.read()
     if not ret:
         print("Error in receiving frame.")
-    socketio.emit('init_frame', { 'image': convert_image_to_jpeg(frame),
+    else:
+        socketio.emit('init_frame', { 'image': convert_image_to_jpeg(frame),
                                     'size': (frame.shape[0], frame.shape[1]) })
-    print('Init frame emitted')
+        print('Init frame emitted')
 
 @socketio.on('trk')
-def load_tracker(name, box):
+def load_tracker(name, box, playlist):
     global f, tracker, vs, tracker_name, SOT, MOT, tracks, gt
     if name in SOT:
         tracker_name = name
@@ -242,12 +315,16 @@ def load_tracker(name, box):
         if tracker_name == 'DEEPSORT':
             pass    
     print('tracker loaded')
+    start_pipe(playlist)
 
 @socketio.on('start')
-def start_tracking():
-    url = url_for('video_feed')
-    socketio.emit('vs', url)
-    print('Tracking Started')
+def start_tracking(playlist):
+    #url = url_for('video_feed')
+    #socketio.emit('vs', url)
+    #print('Tracking Started')
+    print('Pipe stream Started')
+    print(playlist)
+    #start_pipe(playlist)
 
 @socketio.on('stop')
 def stop_tracking():

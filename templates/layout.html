@@ -5,8 +5,12 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo</title>
+    <link href="https://vjs.zencdn.net/7.15.4/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.15.4/video.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/0.5.14/hls.min.js" integrity="sha512-js37JxjD6gtmJ3N2Qzl9vQm4wcmTilFffk0nTSKzgr3p6aitg73LR205203wTzCCC/NZYO2TAxSa0Lr2VMLQvQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdn.socket.io/4.2.0/socket.io.min.js" integrity="sha384-PiBR5S00EtOj2Lto9Uu81cmoyZqR57XcOna1oAuVuIEjzj0wpqDVfD0JA9eXlRsj" crossorigin="anonymous"></script>
     <script src='https://cdn.plot.ly/plotly-2.4.2.min.js'></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/5.14.1/videojs-contrib-hls.js"></script> -->								<script src="https://vjs.zencdn.net/7.2.3/video.js"></script>
 </head>
 <body>
     {% block body %}{% endblock %}
@@ -19,6 +23,8 @@
     const create_vs = document.getElementById('create_vs');
     const del_vs = document.getElementById('del_vs');
     const vs_status = document.getElementById('vs_status');
+	//var player = videojs('hls-example');
+    var video_container = document.getElementById('hls-container');
     
     const SOT = ['SIAMFC', 'Goturn', 'DLIB', 'CSRT', 'MIL', 'BOOSTING', 'MOSSE', 'KCF', 'TLD', 'MEDIANFLOW'];
     const MOT = ['SORT', 'DEEPSORT'];
@@ -45,7 +51,152 @@
     var x1, y1, w, h;
     box_started = false;
     
-    
+    function create_videoplayer(stream){
+        //console.log(playlist);
+        var video = document.createElement("video");
+        video_container.appendChild(video);
+        video.setAttribute('id', 'video');
+        video.controls = true;
+        video.height = 300;
+        video.width = 400;
+
+        var config = {
+            autoStartLoad: true,
+            startPosition: -1,
+            debug: false,
+            capLevelOnFPSDrop: false,
+            capLevelToPlayerSize: false,
+            defaultAudioCodec: undefined,
+            initialLiveManifestSize: 1,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 600,
+            backBufferLength: Infinity,
+            maxBufferSize: 60 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            highBufferWatchdogPeriod: 2,
+            nudgeOffset: 0.1,
+            nudgeMaxRetry: 3,
+            maxFragLookUpTolerance: 0.25,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: Infinity,
+            liveDurationInfinity: false,
+            enableWorker: true,
+            enableSoftwareAES: true,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 1,
+            manifestLoadingRetryDelay: 1000,
+            manifestLoadingMaxRetryTimeout: 64000,
+            startLevel: undefined,
+            levelLoadingTimeOut: 10000,
+            levelLoadingMaxRetry: 4,
+            levelLoadingRetryDelay: 1000,
+            levelLoadingMaxRetryTimeout: 64000,
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 6,
+            fragLoadingRetryDelay: 1000,
+            fragLoadingMaxRetryTimeout: 64000,
+            startFragPrefetch: false,
+            testBandwidth: true,
+            progressive: false,
+            lowLatencyMode: true,
+            fpsDroppedMonitoringPeriod: 5000,
+            fpsDroppedMonitoringThreshold: 0.2,
+            appendErrorMaxRetry: 3,
+           /*  loader: customLoader,
+            fLoader: customFragmentLoader,
+            pLoader: customPlaylistLoader,
+            xhrSetup: XMLHttpRequestSetupCallback,
+            fetchSetup: FetchSetupCallback,
+            abrController: AbrController,
+            bufferController: BufferController,
+            capLevelController: CapLevelController,
+            fpsController: FPSController,
+            timelineController: TimelineController, */
+            enableWebVTT: true,
+            enableIMSC1: true,
+            enableCEA708Captions: true,
+            stretchShortVideoTrack: false,
+            maxAudioFramesDrift: 1,
+            forceKeyFrameOnDiscontinuity: true,
+            abrEwmaFastLive: 3.0,
+            abrEwmaSlowLive: 9.0,
+            abrEwmaFastVoD: 3.0,
+            abrEwmaSlowVoD: 9.0,
+            abrEwmaDefaultEstimate: 500000,
+            abrBandWidthFactor: 0.95,
+            abrBandWidthUpFactor: 0.7,
+            abrMaxWithRealBitrate: false,
+            maxStarvationDelay: 4,
+            maxLoadingDelay: 4,
+            minAutoBitrate: 0,
+            emeEnabled: false,
+            widevineLicenseUrl: undefined,
+            licenseXhrSetup: undefined,
+            drmSystemOptions: {},
+           /*  requestMediaKeySystemAccessFunc: requestMediaKeySystemAccess, */
+            };
+
+        var hls = new Hls();
+
+
+        if (Hls.isSupported()) {
+            // bind them together
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+            console.log('video and hls.js are now bound together !');
+            hls.loadSource('http://52.247.58.8/hls/' + stream + '/index.m3u8');
+            hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                console.log(
+                'manifest loaded, found ' + data.levels.length + ' quality level'
+                );
+            });
+            });
+            hls.on(Hls.Events.ERROR, function (event, data) {
+            if (data.fatal) {
+                switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                    // try to recover network error
+                    console.log('fatal network error encountered, try to recover');
+                    hls.startLoad();
+                    hls.loadSource('http://52.247.58.8/hls/' + stream + '/index.m3u8');
+                    
+                    break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                    console.log('fatal media error encountered, try to recover');
+                    hls.loadSource('http://52.247.58.8/hls/' + stream + '/index.m3u8');
+                    //hls.recoverMediaError();
+                    break;
+                default:
+                    // cannot recover
+                    hls.destroy();
+                    break;
+                }
+            }
+            });
+            
+            hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
+            console.log(data);
+            console.log(hls.bandwidthEstimate);
+            //hls.loadSource('http://52.247.58.8/hls/' + stream + '/index.m3u8');
+        });
+        }
+
+        //video.play();
+        //var sourceMP4 = document.createElement("source");
+        //sourceMP4.type = "application/x-mpegURL";
+        //sourceMP4.src = `static/hls/${playlist}.m3u8`;
+        //videlem.appendChild(sourceMP4);
+        //videlem.controls = true;
+        //videlem.height = 300;
+        //videlem.width = 400;
+        //video_container.appendChild(videlem);
+        
+        //videlem.classList.add('video-js');
+        //videlem.classList.add('vjs-default-skin');
+        //var player = videojs('hls2');
+        //var hls = new Hls();
+    }
+
     function onchange_tracker(){
         try{
             Plotly.purge('success_plot');
@@ -55,6 +206,8 @@
             console.log('Plots already deleted');
         }
 
+
+        
         console.log(tracker.value);
         if(SOT.includes(tracker.value)){ 
             streamer.appendChild(c);
@@ -124,7 +277,9 @@
             //drawCanvas();
             const box = [x1, y1, w, h];
             console.log(tracker.value);
-            socket.emit('trk', tracker.value, box);
+            playlist = vs.value.split('.')[0] + tracker.value;
+            console.log(playlist);
+            socket.emit('trk', tracker.value, box, playlist);
         }
         else{
             console.log(tracker.value);
@@ -133,14 +288,19 @@
 
         tracker_status.innerHTML = 'Tracker Loaded.'
         console.log('Tracker Loaded');
+
+       
     });
 
     start.addEventListener('click', function(e){
+        playlist = vs.value.split('.')[0] + tracker.value;
+        //playlist = 'event';
+        create_videoplayer(playlist);
         if(SOT.includes(tracker.value)){
             streamer.removeChild(c);
-        }
-        streamer.appendChild(img);
-        socket.emit('start');
+        } 
+        //streamer.appendChild(img);
+        //socket.emit('start', playlist);
         vs_status.innerHTML = '';
         model_status.innerHTML = '';
         tracker_status.innerHTML = '';
